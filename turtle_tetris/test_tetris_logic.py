@@ -13,6 +13,7 @@ or simply:
     python3 test_tetris_logic.py
 """
 
+import random
 import unittest
 
 import tetris_logic as logic
@@ -62,18 +63,33 @@ class NewPieceTests(unittest.TestCase):
 
     def test_piece_spawns_within_column_bounds(self) -> None:
         # It doesn't have to be centered perfectly, but it must not spawn
-        # partially off the board horizontally for any shape.
-        for _ in range(50):
-            piece = logic.new_piece()
-            for (dc, _dr) in logic.piece_blocks(piece):
-                col = piece["col"] + dc
-                self.assertTrue(0 <= col < logic.COLS)
+        # partially off the board horizontally. We check every shape by
+        # name instead of drawing random ones, so all seven are covered
+        # every run.
+        spawn_col = logic.new_piece()["col"]
+        for name in logic.SHAPES:
+            with self.subTest(shape=name):
+                piece: logic.Piece = {
+                    "name": name,
+                    "rotation": 0,
+                    "col": spawn_col,
+                    "row": 0,
+                }
+                for (dc, _dr) in logic.piece_blocks(piece):
+                    col = piece["col"] + dc
+                    self.assertTrue(0 <= col < logic.COLS)
 
     def test_many_new_pieces_eventually_cover_all_shapes(self) -> None:
-        # Not a strict guarantee (it's random!), but with 200 draws the
-        # odds of missing a shape are astronomically small, so this also
-        # catches an accidental typo in SHAPES.keys().
-        seen = {logic.new_piece()["name"] for _ in range(200)}
+        # new_piece() picks at random, so we pin the random number
+        # generator to a fixed starting point ("seed") first. That makes
+        # this test give the same answer every single time it runs -- a
+        # test that only *usually* passes is worse than no test at all.
+        state = random.getstate()
+        try:
+            random.seed(20250918)
+            seen = {logic.new_piece()["name"] for _ in range(200)}
+        finally:
+            random.setstate(state)
         self.assertEqual(seen, set(logic.SHAPES.keys()))
 
 
@@ -254,6 +270,23 @@ class ClearFullRowsTests(unittest.TestCase):
         self.assertEqual(board[1][0], "green")
         self.assertIsNone(board[0][0])
 
+    def test_rows_below_a_cleared_row_do_not_move(self) -> None:
+        # Only rows ABOVE a cleared line shift down; rows below stay
+        # exactly where they are. This is the behavior SPEC.md's
+        # "before/after" diagram (section 8.2) teaches.
+        board = logic.new_board()
+        board[0][0] = "green"                    # above the cleared row
+        board[1] = ["red"] * logic.COLS          # the row that gets cleared
+        board[2][0] = "blue"                     # below the cleared row
+        board[2][2] = "blue"
+
+        logic.clear_full_rows(board)
+
+        self.assertTrue(all(cell is None for cell in board[0]))  # new empty row
+        self.assertEqual(board[1][0], "green")                    # shifted down
+        self.assertEqual(board[2][0], "blue")                     # did not move
+        self.assertEqual(board[2][2], "blue")
+
 
 class ScoreForLinesTests(unittest.TestCase):
     """Tests for logic.score_for_lines()."""
@@ -293,17 +326,46 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(logic.score_for_lines(cleared), 100)
 
     def test_game_over_condition_when_stack_reaches_the_top(self) -> None:
+        # Fill the top TWO rows, simulating a stack that has reached the
+        # ceiling. Every shape's spawn rotation occupies some square in
+        # row 0 or row 1, so no piece can fit -- which is exactly the
+        # game-over check tetris.py performs after spawning each piece.
+        #
+        # We check every shape by name rather than drawing a random one,
+        # so this test either always passes or always fails, instead of
+        # depending on which piece happens to come up.
+        for name in logic.SHAPES:
+            with self.subTest(shape=name):
+                board = logic.new_board()
+                board[0] = ["red"] * logic.COLS
+                board[1] = ["red"] * logic.COLS
+                piece: logic.Piece = {
+                    "name": name,
+                    "rotation": 0,
+                    "col": logic.COLS // 2 - 2,
+                    "row": 0,
+                }
+                self.assertFalse(logic.valid_position(board, piece))
+
+    def test_a_flat_i_piece_still_fits_when_only_the_top_row_is_full(self) -> None:
+        # A deliberately surprising case, worth knowing about: the "I"
+        # piece's spawn shape is a horizontal bar sitting in row 1, with
+        # nothing at all in row 0. So a board whose top row alone is full
+        # does NOT end the game for an I piece -- it drops into row 1
+        # quite happily. (Normal play can't reach that board state
+        # anyway, since blocks never float above an empty row.)
         board = logic.new_board()
-        # Fill the very top row completely, simulating a stack that has
-        # reached the ceiling.
         board[0] = ["red"] * logic.COLS
-        new = logic.new_piece()
-        new["col"] = logic.COLS // 2 - 2
-        new["row"] = 0
-        # However the piece is shaped, it should not fit on top of a
-        # completely full top row -- this is exactly the game-over check
-        # tetris.py performs after spawning each new piece.
-        self.assertFalse(logic.valid_position(board, new))
+        i_piece: logic.Piece = {
+            "name": "I",
+            "rotation": 0,
+            "col": logic.COLS // 2 - 2,
+            "row": 0,
+        }
+        self.assertEqual(
+            logic.piece_blocks(i_piece), [(0, 1), (1, 1), (2, 1), (3, 1)]
+        )
+        self.assertTrue(logic.valid_position(board, i_piece))
 
 
 if __name__ == "__main__":

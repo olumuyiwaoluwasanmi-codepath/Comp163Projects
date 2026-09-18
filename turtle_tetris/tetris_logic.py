@@ -18,15 +18,36 @@ CONCEPTS USED IN THIS FILE (look for the tag in the comments):
 """
 
 import random
+from typing import TypedDict
 
 # ---------------------------------------------------------------------------
-# Type aliases using modern built-in generics (Python 3.10+): no need to
-# `import typing` at all -- `list[...]`, `dict[...]`, and `X | None` are
-# understood directly by Python itself now.
+# Type declarations.
+#
+# `type NAME = ...` is Python's modern type-alias statement: it gives a
+# long type a short, readable name, so the rest of the file can just say
+# `Board` instead of spelling out `list[list[str | None]]` every time.
+#
+# Type declarations are optional in Python -- the program runs exactly the
+# same without them -- but they document what each function expects, and
+# your editor will warn you when you pass the wrong thing.
 # ---------------------------------------------------------------------------
-Cell = str | None
-Board = list[list[Cell]]
-Piece = dict[str, str | int]
+type Cell = str | None          # a color name like "cyan", or None if empty
+type Board = list[list[Cell]]   # a list of rows; each row is a list of cells
+
+
+class Piece(TypedDict):
+    """A single falling tetromino.
+
+    At runtime a piece is an ordinary Python [DICTIONARY] -- you build one
+    with a normal `{...}` literal and read it with `piece["name"]`.
+    `TypedDict` simply records *which* keys it has and what type each
+    value is, so your editor can autocomplete the keys and flag typos.
+    """
+
+    name: str       # which tetromino it is, e.g. "T"      [STRING]
+    rotation: int   # index into SHAPES[name]; starts at 0
+    col: int        # the board column of the piece's anchor
+    row: int        # the board row of the piece's anchor
 
 # ---------------------------------------------------------------------------
 # Board size (just plain numbers, but we give them names so the rest of the
@@ -117,20 +138,17 @@ def new_board() -> Board:
 def new_piece() -> Piece:
     """Create a new falling tetromino, chosen at random.
 
-    The piece is represented as a [DICTIONARY] with four keys:
-
-    * ``"name"``     -- which tetromino it is, e.g. ``"T"`` [STRING].
-    * ``"rotation"`` -- index into ``SHAPES[name]``; always starts at ``0``.
-    * ``"col"``      -- the board column of the piece's top-left corner.
-    * ``"row"``      -- the board row of the piece's top-left corner.
+    The piece is a [DICTIONARY] with the four keys described by the
+    ``Piece`` declaration at the top of this file.
 
     Args:
         (none)
 
     Returns:
-        Piece: a new piece dictionary, horizontally centered near the top
-        of the board (``row`` is ``0``, so part of it may still be above
-        row 0 depending on its shape).
+        Piece: a new piece dictionary, roughly centered horizontally and
+        anchored at row 0, so its blocks occupy the top few rows of the
+        board (every shape's offsets start at row 0, so a new piece is
+        always fully on the board).
     """
     name: str = random.choice(list(SHAPES.keys()))
     piece: Piece = {
