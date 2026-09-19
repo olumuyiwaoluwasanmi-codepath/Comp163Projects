@@ -172,6 +172,7 @@ to see every option.
 | `ascii_art_logic.py` | All the **font data and rules** — the letter patterns, and the functions that turn text into rows of characters. No `input()`, no `print()`. |
 | `asciiprint.py` | The **interactive program** — asks you questions, then hands your answers to `ascii_art_logic.py` and prints the result. |
 | `test_ascii_art_logic.py` | 30 automated tests (including regression tests) for `ascii_art_logic.py`. |
+| `test_asciiprint.py` | 23 automated tests for `asciiprint.py` — the prompts, the command-line flags, and `main()` end-to-end — using `unittest.mock.patch` to fake typed answers. |
 | `SPEC.md` | A guided tour of the design, with diagrams. |
 
 Splitting the *font/rendering rules* from the *interactive program* is
@@ -211,34 +212,51 @@ Any other character (an accented letter, an emoji, a typo) is drawn as a
 ## Running the tests
 
 `ascii_art_logic.py` has zero dependency on `input()`/`print()`, so its
-tests run instantly:
+tests run instantly. `asciiprint.py` *does* call `input()` and `print()`,
+but its tests never wait for a real person to type anything — they use
+`unittest.mock.patch` to feed in canned answers and capture what would
+have been printed, so they run instantly too. Run everything with:
 
 ```bash
 cd asciiprint
-python3 -m unittest test_ascii_art_logic.py -v
+python3 -m unittest discover -p "test_*.py" -v
 ```
 
-You should see all 30 tests pass. They're organized into groups —
-including a `RegressionTests` group that locks in the *exact* expected
-output for a few words, so an accidental change to the font or the
-scaling math gets caught immediately, even if it doesn't break any of
-the more general tests. If you change a letter's shape in `FONT` or
-tweak `scale_grid()`, run the tests again and see what (if anything)
+or run one file at a time:
+
+```bash
+python3 -m unittest test_ascii_art_logic.py -v
+python3 -m unittest test_asciiprint.py -v
+```
+
+You should see all 53 tests pass (30 + 23). They're organized into
+groups — including a `RegressionTests` group in
+`test_ascii_art_logic.py` that locks in the *exact* expected output for
+a few words, so an accidental change to the font or the scaling math
+gets caught immediately, even if it doesn't break any of the more
+general tests; and a `MainEndToEndTests` group in `test_asciiprint.py`
+that runs the whole program from command-line flags (or from faked
+prompt answers) all the way to the printed banner. If you change a
+letter's shape in `FONT`, tweak `scale_grid()`, or change how a prompt
+validates its answer, run the tests again and see what (if anything)
 breaks — that's the whole point of having them!
 
 ## Type checking (optional)
 
 Every function in this project declares the types of what it takes in
-and what it gives back. Python doesn't check those declarations when it
+and what it gives back, and `ascii_art_logic.py` goes a step further
+with **named type aliases** (`Row`, `Glyph`, `Grid`) so a signature like
+`build_base_grid(text: str) -> Grid` reads as English instead of a wall
+of `list[str]`. Python doesn't check any of these declarations when it
 runs — they're there for you and your editor — but you can have a tool
 check them for you:
 
 ```bash
 pip install mypy
-mypy --strict ascii_art_logic.py asciiprint.py test_ascii_art_logic.py
+mypy --strict ascii_art_logic.py asciiprint.py test_ascii_art_logic.py test_asciiprint.py
 ```
 
-All three files pass `--strict` with no errors.
+All four files pass `--strict` with no errors.
 
 ## Where each concept lives
 

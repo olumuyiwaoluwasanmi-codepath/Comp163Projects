@@ -17,6 +17,25 @@ CONCEPTS USED IN THIS FILE (look for the tag in the comments):
     [CONDITIONAL] if/elif/else decisions
 """
 
+from typing import TypeAlias
+
+# ---------------------------------------------------------------------------
+# Type aliases.
+#
+# `NAME: TypeAlias = ...` gives a plain `str` or `list[str]` a name that
+# says what it actually *means* in this file, so a function signature
+# like `get_glyph(character: str) -> Glyph` reads as English instead of
+# just repeating `list[str]` everywhere.
+#
+# Type hints are optional in Python -- the program runs exactly the same
+# without them -- but they document what each function expects, your
+# editor can autocomplete and flag mistakes with them, and a checker like
+# mypy can catch a wrong type before you ever run the code.
+# ---------------------------------------------------------------------------
+Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
+Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
+Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
+
 # ---------------------------------------------------------------------------
 # [DICTIONARY] SIZES maps a size name [STRING] -> how many times bigger each
 # little square of the letter should be drawn. "small" draws each square as
@@ -29,16 +48,17 @@ SIZES: dict[str, int] = {
 }
 
 # ---------------------------------------------------------------------------
-# [DICTIONARY] FONT maps a single character [STRING] -> a [LIST] of 7 rows.
-# Each row is a 5-character [STRING] made only of "#" (part of the letter)
-# and "." (empty space). Together the 7 rows draw the letter on a 5-wide,
-# 7-tall grid -- the same idea as the dot-matrix signs on old scoreboards.
+# [DICTIONARY] FONT maps a single character [STRING] -> a Glyph: a [LIST] of
+# 7 rows. Each row is a 5-character [STRING] made only of "#" (part of the
+# letter) and "." (empty space). Together the 7 rows draw the letter on a
+# 5-wide, 7-tall grid -- the same idea as the dot-matrix signs on old
+# scoreboards.
 #
 # Try printing one yourself to see it:
 #   for row in FONT["A"]:
 #       print(row)
 # ---------------------------------------------------------------------------
-FONT: dict[str, list[str]] = {
+FONT: dict[str, Glyph] = {
     "A": [
         ".###.",
         "#...#",
@@ -434,10 +454,10 @@ GLYPH_WIDTH = 5
 
 # The glyph shown for any character that isn't in FONT, so a typo never
 # crashes the program -- it just shows up as an obvious "?" instead.
-UNKNOWN_GLYPH = FONT["?"]
+UNKNOWN_GLYPH: Glyph = FONT["?"]
 
 
-def get_glyph(character: str) -> list[str]:
+def get_glyph(character: str) -> Glyph:
     """Return the 7-row [LIST] pattern for one character [STRING].
 
     Lowercase letters are converted to uppercase first, since FONT only
@@ -447,14 +467,14 @@ def get_glyph(character: str) -> list[str]:
     return FONT.get(character.upper(), UNKNOWN_GLYPH)  # [CONDITIONAL] (inside .get)
 
 
-def build_base_grid(text: str) -> list[str]:
+def build_base_grid(text: str) -> Grid:
     """Turn `text` into 7 [STRING] rows of "#"/"." at actual size (1x).
 
     Each character's glyph is glued onto the end of every row, with one
     extra "." column added after it as a small gap -- otherwise letters
     would touch each other with no space between them.
     """
-    rows = ["" for _ in range(GLYPH_HEIGHT)]  # [LIST] one entry per row
+    rows: Grid = ["" for _ in range(GLYPH_HEIGHT)]  # [LIST] one entry per row
     for character in text:  # [LOOP] one character at a time, left to right
         glyph = get_glyph(character)
         for row_index in range(GLYPH_HEIGHT):  # [LOOP] stack this glyph's rows on
@@ -462,14 +482,14 @@ def build_base_grid(text: str) -> list[str]:
     return rows
 
 
-def scale_grid(rows: list[str], multiplier: int) -> list[str]:
+def scale_grid(rows: Grid, multiplier: int) -> Grid:
     """Blow up a grid of rows by `multiplier`, both wider and taller.
 
     Each character becomes a multiplier x multiplier block: repeated
     `multiplier` times across (so "#" becomes "##" at 2x), and each whole
     row is then repeated `multiplier` times down, so the block is square.
     """
-    scaled_rows: list[str] = []
+    scaled_rows: Grid = []
     for row in rows:  # [LOOP] widen this row, then duplicate it downward
         wide_row = "".join(character * multiplier for character in row)
         for _ in range(multiplier):  # [LOOP] repeat the widened row `multiplier` times
@@ -477,7 +497,7 @@ def scale_grid(rows: list[str], multiplier: int) -> list[str]:
     return scaled_rows
 
 
-def render_text(text: str, fill_char: str = "*", size: str = "big") -> list[str]:
+def render_text(text: str, fill_char: str = "*", size: str = "big") -> Grid:
     """Turn `text` into a [LIST] of printable ASCII-art rows.
 
     `fill_char` is the single character drawn for every "on" pixel of a

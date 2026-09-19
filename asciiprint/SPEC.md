@@ -35,7 +35,8 @@ Section 8 below (the concept map) gives exact file/line references.
 asciiprint/
 ├── ascii_art_logic.py       # Pure font data and rendering rules — no input()/print()
 ├── asciiprint.py             # Interactive program: asks questions, prints the result
-├── test_ascii_art_logic.py   # Automated tests (including regression tests)
+├── test_ascii_art_logic.py   # Automated tests (including regression tests) for the logic
+├── test_asciiprint.py        # Automated tests for the interactive program itself
 ├── README.md                  # Quickstart, controls, concept index
 └── SPEC.md                    # This file
 ```
@@ -78,6 +79,20 @@ no window to close when a test hangs.
 strings**, each 5 characters wide — a tiny 5x7 grid, the same idea used
 by real dot-matrix signs.
 
+Three small **type aliases**, defined at the top of `ascii_art_logic.py`,
+name these shapes so function signatures read as English:
+
+```python
+Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
+Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
+Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
+```
+
+So `FONT` is typed as `dict[str, Glyph]`, and `render_text()` returns a
+`Grid` — which mypy checks is really `list[str]` under the hood, but a
+reader instantly knows *what kind* of list of strings it is, the same
+way `turtle_tetris`'s `type Board = list[list[Cell]]` names its shape.
+
 ```mermaid
 flowchart TB
     FONT["FONT (dict)"] -->|"'A' ->"| A["['.###.',\n '#...#',\n '#...#',\n '#####',\n '#...#',\n '#...#',\n '#...#']"]
@@ -108,7 +123,7 @@ around unexplained.
 ## 4. `get_glyph()`: looking a character up safely
 
 ```python
-def get_glyph(character: str) -> list[str]:
+def get_glyph(character: str) -> Glyph:
     return FONT.get(character.upper(), UNKNOWN_GLYPH)
 ```
 
@@ -218,19 +233,21 @@ boundary, then trust them completely for the rest of the function.
 
 | Concept | Where | What to look at |
 |---|---|---|
-| **Strings** | `ascii_art_logic.py:41-431` | Every glyph row in `FONT`, e.g. `"#...#"` |
-| **Strings** | `ascii_art_logic.py:447` | `character.upper()` |
-| **Lists** | `ascii_art_logic.py:25-30` | `SIZES` values are plain ints, but every `FONT` entry is a list |
-| **Lists** | `ascii_art_logic.py:457` | `rows = ["" for _ in range(GLYPH_HEIGHT)]` |
-| **Dictionaries** | `ascii_art_logic.py:25-30` | `SIZES` |
-| **Dictionaries** | `ascii_art_logic.py:41-431` | `FONT` |
-| **Dictionaries** | `ascii_art_logic.py:447` | `FONT.get(...)` — a dictionary lookup with a default |
-| **Loops** | `ascii_art_logic.py:458-461` | `build_base_grid()`'s two nested `for` loops |
-| **Loops** | `ascii_art_logic.py:473-476` | `scale_grid()`'s two `for` loops |
+| **Strings** | `ascii_art_logic.py:61-451` | Every glyph row in `FONT`, e.g. `"#...#"` |
+| **Strings** | `ascii_art_logic.py:467` | `character.upper()` |
+| **Lists** | `ascii_art_logic.py:44-48` | `SIZES` values are plain ints, but every `FONT` entry is a list |
+| **Lists** | `ascii_art_logic.py:477` | `rows = ["" for _ in range(GLYPH_HEIGHT)]` |
+| **Dictionaries** | `ascii_art_logic.py:44-48` | `SIZES` |
+| **Dictionaries** | `ascii_art_logic.py:61-451` | `FONT` |
+| **Dictionaries** | `ascii_art_logic.py:467` | `FONT.get(...)` — a dictionary lookup with a default |
+| **Loops** | `ascii_art_logic.py:478-482` | `build_base_grid()`'s two nested `for` loops |
+| **Loops** | `ascii_art_logic.py:493-496` | `scale_grid()`'s two `for` loops |
 | **Loops** | `asciiprint.py` | Every `while True:` prompt loop (`ask_word`, `ask_char`, `ask_size`), plus the `for line in lines:` print loop in `main()` |
-| **Conditionals** | `ascii_art_logic.py:490-499` | `render_text()`'s input validation |
-| **Conditionals** | `ascii_art_logic.py:447` | The fallback built into `.get(..., UNKNOWN_GLYPH)` |
+| **Conditionals** | `ascii_art_logic.py:510-518` | `render_text()`'s input validation |
+| **Conditionals** | `ascii_art_logic.py:467` | The fallback built into `.get(..., UNKNOWN_GLYPH)` |
 | **Conditionals** | `asciiprint.py` | Every prompt loop's `if raw == "": ...` / `if raw.isdigit(): ...` checks |
+| **Type hints & aliases** | `ascii_art_logic.py:20-38` | The `Row` / `Glyph` / `Grid` `TypeAlias` definitions |
+| **Type hints & aliases** | Every function signature in `ascii_art_logic.py` and `asciiprint.py` | Every parameter and return value is annotated; verified with `mypy --strict` |
 
 Every `[TAG]` comment inside `ascii_art_logic.py` and `asciiprint.py`
 marks one of these ideas in the exact spot it's being used — search for
@@ -244,10 +261,17 @@ so the tags are the reliable way to find them.
 
 * Read [`README.md`](./README.md#stretch-goals) for a list of stretch
   goals, roughly ordered by difficulty.
-* Run the tests (`python3 -m unittest test_ascii_art_logic.py -v`) and
+* Run the tests (`python3 -m unittest discover -p "test_*.py" -v`) and
   read through `test_ascii_art_logic.py` — the test class names
   (`FontDataTests`, `GetGlyphTests`, `BuildBaseGridTests`,
   `ScaleGridTests`, `RenderTextTests`, `RegressionTests`) double as a
   second, executable description of every rule in this document.
-* Try breaking something on purpose — change a glyph in `FONT`, or the
-  gap width in `build_base_grid()` — and watch which tests catch it.
+* Read `test_asciiprint.py` too — `AskWordTests`, `AskCharTests`, and
+  `AskSizeTests` cover every prompt-loop branch, `BuildParserTests`
+  covers the `--char`/`--size` command-line flags, and
+  `MainEndToEndTests` runs the whole program start to finish (using
+  `unittest.mock.patch` to fake typed answers) and checks the exact
+  banner it prints.
+* Try breaking something on purpose — change a glyph in `FONT`, the gap
+  width in `build_base_grid()`, or a validation check in `ask_char()` —
+  and watch which tests catch it.

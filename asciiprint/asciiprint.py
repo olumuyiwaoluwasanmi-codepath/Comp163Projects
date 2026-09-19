@@ -81,7 +81,7 @@ def main() -> None:
     size = args.size if args.size is not None else ask_size()
 
     try:
-        lines = ascii_art_logic.render_text(text, fill_char, size)
+        lines: ascii_art_logic.Grid = ascii_art_logic.render_text(text, fill_char, size)
     except ValueError as error:
         print(f"Oops, I can't print that: {error}")
         return
