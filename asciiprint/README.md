@@ -260,7 +260,7 @@ All four files pass `--strict` with no errors.
 
 ## Where each concept lives
 
-This is a quick index. [`SPEC.md`](./SPEC.md#9-concept-map-with-fileline-references)
+This is a quick index. [`SPEC.md`](./SPEC.md#10-concept-map-with-fileline-references)
 has the full table with exact file/line references and more context —
 this is just enough to get you started reading the code with a purpose.
 

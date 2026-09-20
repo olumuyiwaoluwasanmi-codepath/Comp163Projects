@@ -25,7 +25,7 @@ head:
 | **Loops** | Walking across every character in the input, and every row of every glyph |
 | **Conditionals** | Validating the user's inputs, and falling back to `?` for characters the font doesn't know |
 
-Section 9 below (the concept map) gives exact file/line references.
+Section 10 below (the concept map) gives exact file/line references.
 
 ---
 
@@ -72,57 +72,20 @@ no window to close when a test hangs.
 
 ---
 
-## 3. The font: a dictionary of lists of strings
+## 3. What is a type hint, and what is a `TypeAlias`?
 
-`FONT` is the heart of the project. Every key is a single character
-(`"A"`, `"7"`, `"!"`, `" "`, ...), and every value is a **list of 7
-strings**, each 5 characters wide — a tiny 5x7 grid, the same idea used
-by real dot-matrix signs.
-
-Three small **type aliases**, defined at the top of `ascii_art_logic.py`,
-name these shapes so function signatures read as English:
+Before we get to the font data itself, it's worth pausing on two ideas
+you'll see all over `ascii_art_logic.py`: **type hints** in general, and
+**type aliases** in particular. Here's the exact code from the top of
+that file that we'll unpack in this section:
 
 ```python
+from typing import TypeAlias
+
 Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
 Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
 Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
 ```
-
-So `FONT` is typed as `dict[str, Glyph]`, and `render_text()` returns a
-`Grid` — which mypy checks is really `list[str]` under the hood, but a
-reader instantly knows *what kind* of list of strings it is, the same
-way `turtle_tetris`'s `type Board = list[list[Cell]]` names its shape.
-
-```mermaid
-flowchart TB
-    FONT["FONT (dict)"] -->|"'A' ->"| A["['.###.',\n '#...#',\n '#...#',\n '#####',\n '#...#',\n '#...#',\n '#...#']"]
-    FONT -->|"'1' ->"| ONE["['..#..',\n '.##..',\n '..#..',\n '..#..',\n '..#..',\n '..#..',\n '#####']"]
-    FONT -->|"' ' ->"| SPACE["7 rows of\n'.....'"]
-```
-
-`"#"` means "this pixel is part of the letter"; `"."` means "leave it
-blank." Printing `FONT["A"]` one row at a time already draws a
-recognizable letter A:
-
-```
-.###.
-#...#
-#...#
-#####
-#...#
-#...#
-#...#
-```
-
-`GLYPH_HEIGHT` (7) and `GLYPH_WIDTH` (5) are just those two numbers given
-names, so the rest of the code never has a magic `7` or `5` floating
-around unexplained.
-
-### 3.1 What is a type hint, and what is a `TypeAlias`?
-
-The `Row: TypeAlias = str` line above uses two ideas that are worth
-slowing down on if you haven't seen them before: **type hints** in
-general, and **type aliases** in particular.
 
 #### Type hints: optional labels, not enforced rules
 
@@ -180,24 +143,16 @@ rendered output lines? Both, as it turns out, but `list[str]` alone
 can't say which.
 
 A **type alias** solves this by giving a plain type expression a new,
-meaningful name — nothing more:
-
-```python
-from typing import TypeAlias
-
-Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
-Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
-Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
-```
-
-Each line reads as an ordinary variable assignment, because that's
-almost exactly what it is: `Row` is assigned the value `str`, `Glyph` is
-assigned the value `list[Row]` (which mypy resolves to `list[str]`), and
-`Grid` is assigned `list[Row]` too. The `: TypeAlias` annotation on the
-left tells mypy (and a human skimming the file) "this assignment isn't
-creating a normal variable to hold data — it's declaring a *name for a
-type*, to be used in hints elsewhere." From that point on, `Glyph` and
-`Grid` can be used anywhere a type hint is expected:
+meaningful name — nothing more. That's exactly what the `Row`, `Glyph`,
+and `Grid` lines at the top of this section do. Each line reads as an
+ordinary variable assignment, because that's almost exactly what it is:
+`Row` is assigned the value `str`, `Glyph` is assigned the value
+`list[Row]` (which mypy resolves to `list[str]`), and `Grid` is assigned
+`list[Row]` too. The `: TypeAlias` annotation on the left tells mypy
+(and a human skimming the file) "this assignment isn't creating a normal
+variable to hold data — it's declaring a *name for a type*, to be used
+in hints elsewhere." From that point on, `Glyph` and `Grid` can be used
+anywhere a type hint is expected:
 
 ```python
 FONT: dict[str, Glyph] = { ... }
@@ -236,196 +191,8 @@ A few things worth noticing:
   glyph" (a single character's pattern), not just "some list of
   strings" that could mean anything.
 
-### 3.2 Storing one character: it's just a grid of text, nothing fancy
-
-There's no image format, no binary data, and no external font file
-anywhere in this project — a "glyph" is stored exactly the way it looks
-printed on the page: as **7 plain strings, 5 characters each**, sitting
-next to each other in a `list`. That's the entire storage model. Because
-a `Glyph` is a `list[str]`, you can reach any single pixel with ordinary
-double indexing — `list[row][column]`:
-
-```python
-FONT["A"]        # the whole glyph -- a list of 7 strings
-FONT["A"][3]     # row 3 (0-indexed, so the 4th row) -- the string "#####"
-FONT["A"][3][2]  # column 2 of that row -- the character "#"
-                 # (the exact middle of the letter A's horizontal crossbar)
-```
-
-```mermaid
-flowchart TB
-    subgraph glyph["FONT['A']  (a Glyph = list[str], 7 entries)"]
-        r0["row 0: '.###.'"]
-        r1["row 1: '#...#'"]
-        r2["row 2: '#...#'"]
-        r3["row 3: '#####'"]
-        r4["row 4: '#...#'"]
-        r5["row 5: '#...#'"]
-        r6["row 6: '#...#'"]
-    end
-    r3 -->|"index [2]"| pixel["'#'  (FONT['A'][3][2])"]
-```
-
-Because rows are ordinary strings, "which column" always means "which
-character position in that string" — column 0 is the leftmost character,
-column `GLYPH_WIDTH - 1` (4) is the rightmost. There's no separate (x, y)
-coordinate object anywhere; two nested indexing operations (`[row]`,
-then `[column]`) *are* the coordinate system.
-
-This also explains why every glyph **must** be exactly `GLYPH_HEIGHT`
-rows of exactly `GLYPH_WIDTH` characters each — if one row of `FONT["A"]`
-were only 4 characters instead of 5, `FONT["A"][3][4]` would raise an
-`IndexError` the moment `build_base_grid()` tried to line it up next to
-a full-width neighbor. `FontDataTests` in `test_ascii_art_logic.py`
-exists specifically to catch that kind of mistake before it ever reaches
-`build_base_grid()` — see `test_every_glyph_has_correct_height` and
-`test_every_glyph_row_has_correct_width`.
-
-### 3.3 A complete worked example: tracing the letter "T" from storage to screen
-
-Let's follow one specific character all the way through, so every idea
-in section 3.2 has a concrete example attached to it instead of staying
-abstract. We'll use `"T"`, and the goal is to end up with exactly what
-`python3 asciiprint.py "T" --char "@" --size small` prints.
-
-**Step 1 — what's actually sitting in `FONT["T"]`.** Laid out with its
-row and column indices labeled, so you can see the coordinate system
-from section 3.2 applied to a real letter:
-
-| row \ col | 0 | 1 | 2 | 3 | 4 | as a string |
-|---|---|---|---|---|---|---|
-| **0** | `#` | `#` | `#` | `#` | `#` | `"#####"` |
-| **1** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-| **2** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-| **3** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-| **4** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-| **5** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-| **6** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
-
-Row 0 is the solid top bar of the "T"; every row after that has a single
-`#` at column 2 (dead center of a 5-wide glyph) — the vertical stem. In
-code, `FONT["T"]` is simply:
-
-```python
-FONT["T"] = ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."]
-```
-
-**Step 2 — calling `get_glyph()`.** Suppose the user typed a lowercase
-`"t"` (this project accepts either case — see section 5). Tracing
-`get_glyph("t")` line by line:
-
-```python
-def get_glyph(character: str) -> Glyph:
-    return FONT.get(character.upper(), UNKNOWN_GLYPH)
-```
-
-1. `character` is `"t"`.
-2. `character.upper()` evaluates to `"T"`.
-3. `FONT.get("T", UNKNOWN_GLYPH)` looks up the key `"T"` in the `FONT`
-   dictionary from Step 1, finds it, and returns that exact list of 7
-   strings — the fallback `UNKNOWN_GLYPH` is never used here, because
-   `"T"` genuinely is a key in `FONT`.
-4. The function returns `["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."]`.
-
-Compare that with a character the font *doesn't* know, like `"&"`:
-`character.upper()` gives `"&"` right back (it has no case to change),
-`FONT.get("&", UNKNOWN_GLYPH)` doesn't find `"&"` as a key, so instead of
-raising a `KeyError` it returns `UNKNOWN_GLYPH` — the `"?"` glyph from
-`FONT["?"]` — which is why `python3 asciiprint.py "T&" --char "@"` draws
-a `T` followed by a `?`-shaped block instead of crashing.
-
-**Step 3 — `build_base_grid()` adds a gap column.** Even for a
-one-character word, `build_base_grid()` (section 6) glues a single extra
-`"."` onto the end of every row — that's the "small gap after each
-letter" rule, and it applies uniformly whether there's one more letter
-coming or not. So the glyph from Step 1 (5 characters wide) becomes a
-6-character-wide **base grid**:
-
-```python
-build_base_grid("T") == [
-    "#####.",   # "#####" + "."
-    "..#...",   # "..#.." + "."
-    "..#...",
-    "..#...",
-    "..#...",
-    "..#...",
-    "..#...",
-]
-```
-
-**Step 4 — scaling it.** At `"small"` (multiplier 1), `scale_grid()`
-(section 7) leaves this base grid completely unchanged — every row is
-repeated 1 time, every character is repeated 1 time, so the output is
-identical to the input. (At `"big"` or `"extra-large"` this step is
-where the real growth happens — see section 7.2 for a full worked
-example of that.)
-
-**Step 5 — turning `"#"`/`"."` into the user's chosen character.**
-`render_text()` (section 8) finishes the job with two find-and-replace
-passes over every row: every `"#"` becomes the fill character (`"@"` in
-this example), and every `"."` becomes a plain space:
-
-```python
-"#####.".replace("#", "@").replace(".", " ")   # -> "@@@@@ "
-"..#...".replace("#", "@").replace(".", " ")   # -> "  @   "
-```
-
-**Step 6 — the result.** Applying Step 5 to all 7 rows from Step 3
-reproduces, character for character, what actually prints to the
-terminal for `python3 asciiprint.py "T" --char "@" --size small`:
-
-```
-@@@@@ 
-  @   
-  @   
-  @   
-  @   
-  @   
-  @   
-```
-
-Every row is 6 characters wide (`GLYPH_WIDTH` + 1 gap column), even
-though the trailing spaces after each `@` don't show up visually in a
-terminal — they're genuinely part of the string, which is exactly why
-`RenderTextTests.test_output_line_count_matches_size` and the
-`RegressionTests` group in `test_ascii_art_logic.py` compare full row
-strings (including trailing spaces) rather than just the visible
-characters.
-
-Every rendered word in this program, no matter how long, is just this
-same six-step process — lookup, (optionally) fall back to `"?"`, add a
-gap, scale, substitute, print — repeated once per character and stitched
-together, which is exactly what section 3.4 (a whole word) and section 6
-(`build_base_grid()`) cover next.
-
-### 3.4 Storing a whole word: glyphs placed side by side
-
-`FONT` only ever stores *one character at a time*. A whole word like
-`"HI"` doesn't get its own dictionary entry — instead,
-`build_base_grid()` (walked through in detail in section 6) looks up
-each character's glyph separately and glues them together **row by
-row**: row 0 of every letter's glyph joins up to form row 0 of the whole
-word, row 1 joins row 1, and so on, with one blank `"."` column stitched
-in between letters as a gap.
-
-```mermaid
-flowchart LR
-    subgraph H["FONT['H']"]
-        h0["'#...#'"]
-    end
-    subgraph I["FONT['I']"]
-        i0["'#####'"]
-    end
-    h0 --> gap["+ '.'  (gap column)"] --> i0
-    gap --> row0["row 0 of build_base_grid('HI'):\n'#...#' + '.' + '#####'\n= '#...#.#####'"]
-```
-
-So a rendered word is never one lookup — it's `len(text)` lookups into
-`FONT`, one per character, threaded together row-by-row into a brand new
-`Grid` that exists only for that call to `render_text()`. Nothing about
-a multi-character word is stored anywhere in `FONT` itself; `FONT` only
-ever needs to know how to draw one character, and `build_base_grid()`
-handles combining them.
+With that vocabulary in hand, section 5 below puts `Row`, `Glyph`, and
+`Grid` to work describing `FONT` itself.
 
 ---
 
@@ -507,7 +274,7 @@ sizes.pop("small")       # removes "small" AND returns its value: 1
 ```
 
 This is exactly the pattern `get_glyph()` uses in `ascii_art_logic.py`
-(section 5 below) — `FONT.get(character.upper(), UNKNOWN_GLYPH)` looks up
+(section 6 below) — `FONT.get(character.upper(), UNKNOWN_GLYPH)` looks up
 a character and falls back to a default instead of crashing with a
 `KeyError` when the character isn't in the font.
 
@@ -640,7 +407,247 @@ because it's available.
 
 ---
 
-## 5. `get_glyph()`: looking a character up safely
+## 5. The font: a dictionary of lists of strings
+
+`FONT` is the heart of the project. Every key is a single character
+(`"A"`, `"7"`, `"!"`, `" "`, ...), and every value is a **list of 7
+strings**, each 5 characters wide — a tiny 5x7 grid, the same idea used
+by real dot-matrix signs.
+
+Three small **type aliases**, defined at the top of `ascii_art_logic.py`
+and explained in full in section 3 above, name these shapes so function
+signatures read as English:
+
+```python
+Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
+Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
+Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
+```
+
+So `FONT` is typed as `dict[str, Glyph]`, and `render_text()` returns a
+`Grid` — which mypy checks is really `list[str]` under the hood, but a
+reader instantly knows *what kind* of list of strings it is, the same
+way `turtle_tetris`'s `type Board = list[list[Cell]]` names its shape.
+
+```mermaid
+flowchart TB
+    FONT["FONT (dict)"] -->|"'A' ->"| A["['.###.',\n '#...#',\n '#...#',\n '#####',\n '#...#',\n '#...#',\n '#...#']"]
+    FONT -->|"'1' ->"| ONE["['..#..',\n '.##..',\n '..#..',\n '..#..',\n '..#..',\n '..#..',\n '#####']"]
+    FONT -->|"' ' ->"| SPACE["7 rows of\n'.....'"]
+```
+
+`"#"` means "this pixel is part of the letter"; `"."` means "leave it
+blank." Printing `FONT["A"]` one row at a time already draws a
+recognizable letter A:
+
+```
+.###.
+#...#
+#...#
+#####
+#...#
+#...#
+#...#
+```
+
+`GLYPH_HEIGHT` (7) and `GLYPH_WIDTH` (5) are just those two numbers given
+names, so the rest of the code never has a magic `7` or `5` floating
+around unexplained.
+
+### 5.1 Storing one character: it's just a grid of text, nothing fancy
+
+There's no image format, no binary data, and no external font file
+anywhere in this project — a "glyph" is stored exactly the way it looks
+printed on the page: as **7 plain strings, 5 characters each**, sitting
+next to each other in a `list`. That's the entire storage model. Because
+a `Glyph` is a `list[str]`, you can reach any single pixel with ordinary
+double indexing — `list[row][column]`:
+
+```python
+FONT["A"]        # the whole glyph -- a list of 7 strings
+FONT["A"][3]     # row 3 (0-indexed, so the 4th row) -- the string "#####"
+FONT["A"][3][2]  # column 2 of that row -- the character "#"
+                 # (the exact middle of the letter A's horizontal crossbar)
+```
+
+```mermaid
+flowchart TB
+    subgraph glyph["FONT['A']  (a Glyph = list[str], 7 entries)"]
+        r0["row 0: '.###.'"]
+        r1["row 1: '#...#'"]
+        r2["row 2: '#...#'"]
+        r3["row 3: '#####'"]
+        r4["row 4: '#...#'"]
+        r5["row 5: '#...#'"]
+        r6["row 6: '#...#'"]
+    end
+    r3 -->|"index [2]"| pixel["'#'  (FONT['A'][3][2])"]
+```
+
+Because rows are ordinary strings, "which column" always means "which
+character position in that string" — column 0 is the leftmost character,
+column `GLYPH_WIDTH - 1` (4) is the rightmost. There's no separate (x, y)
+coordinate object anywhere; two nested indexing operations (`[row]`,
+then `[column]`) *are* the coordinate system.
+
+This also explains why every glyph **must** be exactly `GLYPH_HEIGHT`
+rows of exactly `GLYPH_WIDTH` characters each — if one row of `FONT["A"]`
+were only 4 characters instead of 5, `FONT["A"][3][4]` would raise an
+`IndexError` the moment `build_base_grid()` tried to line it up next to
+a full-width neighbor. `FontDataTests` in `test_ascii_art_logic.py`
+exists specifically to catch that kind of mistake before it ever reaches
+`build_base_grid()` — see `test_every_glyph_has_correct_height` and
+`test_every_glyph_row_has_correct_width`.
+
+### 5.2 A complete worked example: tracing the letter "T" from storage to screen
+
+Let's follow one specific character all the way through, so every idea
+in section 5.1 has a concrete example attached to it instead of staying
+abstract. We'll use `"T"`, and the goal is to end up with exactly what
+`python3 asciiprint.py "T" --char "@" --size small` prints.
+
+**Step 1 — what's actually sitting in `FONT["T"]`.** Laid out with its
+row and column indices labeled, so you can see the coordinate system
+from section 5.1 applied to a real letter:
+
+| row \ col | 0 | 1 | 2 | 3 | 4 | as a string |
+|---|---|---|---|---|---|---|
+| **0** | `#` | `#` | `#` | `#` | `#` | `"#####"` |
+| **1** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+| **2** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+| **3** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+| **4** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+| **5** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+| **6** | `.` | `.` | `#` | `.` | `.` | `"..#.."` |
+
+Row 0 is the solid top bar of the "T"; every row after that has a single
+`#` at column 2 (dead center of a 5-wide glyph) — the vertical stem. In
+code, `FONT["T"]` is simply:
+
+```python
+FONT["T"] = ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."]
+```
+
+**Step 2 — calling `get_glyph()`.** Suppose the user typed a lowercase
+`"t"` (this project accepts either case — see section 6). Tracing
+`get_glyph("t")` line by line:
+
+```python
+def get_glyph(character: str) -> Glyph:
+    return FONT.get(character.upper(), UNKNOWN_GLYPH)
+```
+
+1. `character` is `"t"`.
+2. `character.upper()` evaluates to `"T"`.
+3. `FONT.get("T", UNKNOWN_GLYPH)` looks up the key `"T"` in the `FONT`
+   dictionary from Step 1, finds it, and returns that exact list of 7
+   strings — the fallback `UNKNOWN_GLYPH` is never used here, because
+   `"T"` genuinely is a key in `FONT`.
+4. The function returns `["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."]`.
+
+Compare that with a character the font *doesn't* know, like `"&"`:
+`character.upper()` gives `"&"` right back (it has no case to change),
+`FONT.get("&", UNKNOWN_GLYPH)` doesn't find `"&"` as a key, so instead of
+raising a `KeyError` it returns `UNKNOWN_GLYPH` — the `"?"` glyph from
+`FONT["?"]` — which is why `python3 asciiprint.py "T&" --char "@"` draws
+a `T` followed by a `?`-shaped block instead of crashing.
+
+**Step 3 — `build_base_grid()` adds a gap column.** Even for a
+one-character word, `build_base_grid()` (section 7) glues a single extra
+`"."` onto the end of every row — that's the "small gap after each
+letter" rule, and it applies uniformly whether there's one more letter
+coming or not. So the glyph from Step 1 (5 characters wide) becomes a
+6-character-wide **base grid**:
+
+```python
+build_base_grid("T") == [
+    "#####.",   # "#####" + "."
+    "..#...",   # "..#.." + "."
+    "..#...",
+    "..#...",
+    "..#...",
+    "..#...",
+    "..#...",
+]
+```
+
+**Step 4 — scaling it.** At `"small"` (multiplier 1), `scale_grid()`
+(section 8) leaves this base grid completely unchanged — every row is
+repeated 1 time, every character is repeated 1 time, so the output is
+identical to the input. (At `"big"` or `"extra-large"` this step is
+where the real growth happens — see section 8.2 for a full worked
+example of that.)
+
+**Step 5 — turning `"#"`/`"."` into the user's chosen character.**
+`render_text()` (section 9) finishes the job with two find-and-replace
+passes over every row: every `"#"` becomes the fill character (`"@"` in
+this example), and every `"."` becomes a plain space:
+
+```python
+"#####.".replace("#", "@").replace(".", " ")   # -> "@@@@@ "
+"..#...".replace("#", "@").replace(".", " ")   # -> "  @   "
+```
+
+**Step 6 — the result.** Applying Step 5 to all 7 rows from Step 3
+reproduces, character for character, what actually prints to the
+terminal for `python3 asciiprint.py "T" --char "@" --size small`:
+
+```
+@@@@@ 
+  @   
+  @   
+  @   
+  @   
+  @   
+  @   
+```
+
+Every row is 6 characters wide (`GLYPH_WIDTH` + 1 gap column), even
+though the trailing spaces after each `@` don't show up visually in a
+terminal — they're genuinely part of the string, which is exactly why
+`RenderTextTests.test_output_line_count_matches_size` and the
+`RegressionTests` group in `test_ascii_art_logic.py` compare full row
+strings (including trailing spaces) rather than just the visible
+characters.
+
+Every rendered word in this program, no matter how long, is just this
+same six-step process — lookup, (optionally) fall back to `"?"`, add a
+gap, scale, substitute, print — repeated once per character and stitched
+together, which is exactly what section 5.3 (a whole word) and section 7
+(`build_base_grid()`) cover next.
+
+### 5.3 Storing a whole word: glyphs placed side by side
+
+`FONT` only ever stores *one character at a time*. A whole word like
+`"HI"` doesn't get its own dictionary entry — instead,
+`build_base_grid()` (walked through in detail in section 7) looks up
+each character's glyph separately and glues them together **row by
+row**: row 0 of every letter's glyph joins up to form row 0 of the whole
+word, row 1 joins row 1, and so on, with one blank `"."` column stitched
+in between letters as a gap.
+
+```mermaid
+flowchart LR
+    subgraph H["FONT['H']"]
+        h0["'#...#'"]
+    end
+    subgraph I["FONT['I']"]
+        i0["'#####'"]
+    end
+    h0 --> gap["+ '.'  (gap column)"] --> i0
+    gap --> row0["row 0 of build_base_grid('HI'):\n'#...#' + '.' + '#####'\n= '#...#.#####'"]
+```
+
+So a rendered word is never one lookup — it's `len(text)` lookups into
+`FONT`, one per character, threaded together row-by-row into a brand new
+`Grid` that exists only for that call to `render_text()`. Nothing about
+a multi-character word is stored anywhere in `FONT` itself; `FONT` only
+ever needs to know how to draw one character, and `build_base_grid()`
+handles combining them.
+
+---
+
+## 6. `get_glyph()`: looking a character up safely
 
 ```python
 def get_glyph(character: str) -> Glyph:
@@ -660,7 +667,7 @@ Two small design choices matter here:
 
 ---
 
-## 6. From a word to a grid: `build_base_grid()`
+## 7. From a word to a grid: `build_base_grid()`
 
 This function takes a whole string (like `"HI"`) and produces the 7 rows
 of the *actual size* (1x) picture, with every letter's glyph glued onto
@@ -685,14 +692,14 @@ built up in place.
 
 ---
 
-## 7. From a grid to a size: `scale_grid()`
+## 8. From a grid to a size: `scale_grid()`
 
 `SIZES` maps each size name to a **multiplier** — how many times bigger,
 in both directions, the native 5x7 grid should be drawn:
 
 | Size name | Multiplier | A glyph's final dimensions |
 |---|---|---|
-| `"small"` | 1 | 5 wide x 7 tall (exactly as stored in `FONT` — see section 3) |
+| `"small"` | 1 | 5 wide x 7 tall (exactly as stored in `FONT` — see section 5) |
 | `"big"` | 2 | 10 wide x 14 tall |
 | `"extra-large"` | 3 | 15 wide x 21 tall |
 
@@ -713,7 +720,7 @@ trick applied to the existing one — which is exactly why "add a `tiny`
 size" is listed as a stretch goal in the README rather than a one-line
 change to `SIZES`.
 
-### 7.1 How the *expansion* works, step by step
+### 8.1 How the *expansion* works, step by step
 
 `scale_grid()` turns a 1x grid into an *N*x grid two ways at once, and
 the order matters:
@@ -756,13 +763,13 @@ def scale_grid(rows: Grid, multiplier: int) -> Grid:
     return scaled_rows
 ```
 
-### 7.2 A complete worked example: the letter "L"
+### 8.2 A complete worked example: the letter "L"
 
 Here's `FONT["L"]` — 7 rows, 5 characters each, exactly as stored — run
 through `scale_grid()` at each size, so you can see precisely how the
 data grows. (This calls `scale_grid()` directly on the glyph, skipping
 `build_base_grid()`'s gap column, to keep the numbers simple — a full
-word goes through both steps, as covered in sections 3.4 and 6.)
+word goes through both steps, as covered in sections 5.3 and 7.)
 
 **Native storage — `FONT["L"]`, `SIZES["small"] = 1` (5 wide x 7 tall):**
 
@@ -823,7 +830,7 @@ output, not merely 3 times the total character count.
 
 ---
 
-## 8. Putting it together: `render_text()`
+## 9. Putting it together: `render_text()`
 
 `render_text(text, fill_char, size)` is the single function
 `asciiprint.py` calls. It does three things, in order:
@@ -846,7 +853,7 @@ boundary, then trust them completely for the rest of the function.
 
 ---
 
-## 9. Concept map (with file:line references)
+## 10. Concept map (with file:line references)
 
 | Concept | Where | What to look at |
 |---|---|---|
@@ -874,7 +881,7 @@ so the tags are the reliable way to find them.
 
 ---
 
-## 10. Where to go next
+## 11. Where to go next
 
 * Read [`README.md`](./README.md#stretch-goals) for a list of stretch
   goals, roughly ordered by difficulty.
