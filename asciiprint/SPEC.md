@@ -118,7 +118,125 @@ recognizable letter A:
 names, so the rest of the code never has a magic `7` or `5` floating
 around unexplained.
 
-### 3.1 Storing one character: it's just a grid of text, nothing fancy
+### 3.1 What is a type hint, and what is a `TypeAlias`?
+
+The `Row: TypeAlias = str` line above uses two ideas that are worth
+slowing down on if you haven't seen them before: **type hints** in
+general, and **type aliases** in particular.
+
+#### Type hints: optional labels, not enforced rules
+
+A **type hint** is a note you attach to a variable, a function
+parameter, or a function's return value, saying what *kind* of value
+belongs there. You've already been writing them throughout this
+project's function signatures:
+
+```python
+def get_glyph(character: str) -> list[str]:
+    ...
+```
+
+Reading that signature left to right: `character: str` means "the
+parameter named `character` should be a string," and `-> list[str]`
+means "this function returns a list of strings." Two important facts
+about hints like these:
+
+* **Python itself never checks them.** If you called
+  `get_glyph(42)` — passing a number instead of a string — Python would
+  happily try to run the function, and only fail later (with an
+  `AttributeError`, since numbers don't have an `.upper()` method) when
+  it actually hit the line that needed a string. The hint `character:
+  str` is not a guard rail Python enforces; it's *documentation* your
+  editor and a separate tool can read.
+* **`mypy` is that separate tool.** Running `mypy --strict
+  ascii_art_logic.py` (see the README's "Type checking" section) reads
+  every hint in the file and checks, *without running the program at
+  all*, whether every call site actually matches — it would flag
+  `get_glyph(42)` as an error the moment you saved the file, long before
+  you ever ran the program and hit the crash. That's the entire value of
+  type hints: catching a whole category of mistakes earlier and for
+  free, at the cost of a little extra typing up front.
+
+If none of this existed, the program would run exactly the same —
+hints are erased at runtime and have zero effect on behavior. They exist
+purely so humans (reading the code) and tools (like mypy and your
+editor's autocomplete) can reason about it more easily.
+
+#### Type aliases: giving a hint a name
+
+Once your data gets even a little bit nested, a type hint can turn into
+a mouthful. This project's font data is a dictionary that maps a string
+to a list of strings:
+
+```python
+FONT: dict[str, list[str]] = { ... }
+```
+
+That's accurate, but writing `list[str]` again and again — in `FONT`'s
+hint, in `get_glyph()`'s return type, in `build_base_grid()`'s return
+type, in `UNKNOWN_GLYPH`'s hint — doesn't tell a reader *why* it's a
+`list[str]` in each spot. Is it a list of font rows? A list of already-
+rendered output lines? Both, as it turns out, but `list[str]` alone
+can't say which.
+
+A **type alias** solves this by giving a plain type expression a new,
+meaningful name — nothing more:
+
+```python
+from typing import TypeAlias
+
+Row: TypeAlias = str            # one printable row, e.g. "#...#" or "*   *"
+Glyph: TypeAlias = list[Row]    # one character's pattern: GLYPH_HEIGHT rows
+Grid: TypeAlias = list[Row]     # a whole rendered word: also a list of rows
+```
+
+Each line reads as an ordinary variable assignment, because that's
+almost exactly what it is: `Row` is assigned the value `str`, `Glyph` is
+assigned the value `list[Row]` (which mypy resolves to `list[str]`), and
+`Grid` is assigned `list[Row]` too. The `: TypeAlias` annotation on the
+left tells mypy (and a human skimming the file) "this assignment isn't
+creating a normal variable to hold data — it's declaring a *name for a
+type*, to be used in hints elsewhere." From that point on, `Glyph` and
+`Grid` can be used anywhere a type hint is expected:
+
+```python
+FONT: dict[str, Glyph] = { ... }
+
+def get_glyph(character: str) -> Glyph:
+    ...
+
+def build_base_grid(text: str) -> Grid:
+    ...
+```
+
+A few things worth noticing:
+
+* **`Glyph` and `Grid` are both just `list[str]` under the hood.**
+  mypy treats them as fully interchangeable with `list[str]` and with
+  each other — a type alias adds *readability*, not a new, stricter
+  type. Passing a `Grid` where a `Glyph` is expected wouldn't be flagged
+  as an error, because to mypy they're the same underlying type wearing
+  two different name tags. (If you wanted mypy to treat them as
+  genuinely distinct and *reject* mixing them up, you'd reach for a
+  different, stricter tool called `NewType` instead — a good thing to
+  look up once type aliases feel comfortable, but not needed here.)
+* **This still runs on Python 3.11.** A newer Python feature, the
+  `type Row = str` statement (no `: TypeAlias`, no import needed), does
+  the same job with slightly shorter syntax — that's what the sibling
+  `turtle_tetris` project uses for its `type Board = ...` alias — but it
+  requires Python 3.12 or later. Since this project's
+  [README](./README.md#step-1--install-python-311-or-later) only asks
+  for Python 3.11+, `ascii_art_logic.py` uses the older, more widely
+  compatible `NAME: TypeAlias = ...` form instead. Both spellings mean
+  exactly the same thing to mypy.
+* **The payoff shows up at every call site.** Compare
+  `get_glyph(character: str) -> list[str]` with
+  `get_glyph(character: str) -> Glyph` — the second version tells you,
+  without opening `FONT`'s definition, that the return value is "a
+  glyph" (a single character's pattern), not just "some list of
+  strings" that could mean anything.
+
+### 3.2 Storing one character: it's just a grid of text, nothing fancy
 
 There's no image format, no binary data, and no external font file
 anywhere in this project — a "glyph" is stored exactly the way it looks
@@ -163,16 +281,16 @@ exists specifically to catch that kind of mistake before it ever reaches
 `build_base_grid()` — see `test_every_glyph_has_correct_height` and
 `test_every_glyph_row_has_correct_width`.
 
-### 3.2 A complete worked example: tracing the letter "T" from storage to screen
+### 3.3 A complete worked example: tracing the letter "T" from storage to screen
 
 Let's follow one specific character all the way through, so every idea
-in section 3.1 has a concrete example attached to it instead of staying
+in section 3.2 has a concrete example attached to it instead of staying
 abstract. We'll use `"T"`, and the goal is to end up with exactly what
 `python3 asciiprint.py "T" --char "@" --size small` prints.
 
 **Step 1 — what's actually sitting in `FONT["T"]`.** Laid out with its
 row and column indices labeled, so you can see the coordinate system
-from section 3.1 applied to a real letter:
+from section 3.2 applied to a real letter:
 
 | row \ col | 0 | 1 | 2 | 3 | 4 | as a string |
 |---|---|---|---|---|---|---|
@@ -277,10 +395,10 @@ characters.
 Every rendered word in this program, no matter how long, is just this
 same six-step process — lookup, (optionally) fall back to `"?"`, add a
 gap, scale, substitute, print — repeated once per character and stitched
-together, which is exactly what section 3.3 (a whole word) and section 6
+together, which is exactly what section 3.4 (a whole word) and section 6
 (`build_base_grid()`) cover next.
 
-### 3.3 Storing a whole word: glyphs placed side by side
+### 3.4 Storing a whole word: glyphs placed side by side
 
 `FONT` only ever stores *one character at a time*. A whole word like
 `"HI"` doesn't get its own dictionary entry — instead,
@@ -644,7 +762,7 @@ Here's `FONT["L"]` — 7 rows, 5 characters each, exactly as stored — run
 through `scale_grid()` at each size, so you can see precisely how the
 data grows. (This calls `scale_grid()` directly on the glyph, skipping
 `build_base_grid()`'s gap column, to keep the numbers simple — a full
-word goes through both steps, as covered in sections 3.2 and 6.)
+word goes through both steps, as covered in sections 3.4 and 6.)
 
 **Native storage — `FONT["L"]`, `SIZES["small"] = 1` (5 wide x 7 tall):**
 
