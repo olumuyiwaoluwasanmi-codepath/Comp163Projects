@@ -56,7 +56,14 @@ Python:
    installer, then run it and click through.
 2. Close and reopen Terminal, then check with `python3 --version`.
 
-(If you already use Homebrew, `brew install python@3.12` works too.)
+(If you already use Homebrew, that works too — but Homebrew's Python
+does **not** include `tkinter`, so install the matching Tk package
+alongside it. Use whichever version `python3 --version` reports, e.g.
+for Python 3.14:)
+
+```bash
+brew install python@3.14 python-tk@3.14
+```
 
 **Linux (Ubuntu / Debian)**
 
@@ -116,7 +123,7 @@ place. Use the arrow keys to eat every dot before the ghost catches you!
 | What you see | What it means |
 |---|---|
 | `python3: command not found` | Python isn't installed, or wasn't added to PATH. Redo Step 1 — on Windows, watch for that PATH checkbox. Try `python` instead of `python3`. |
-| `No module named 'tkinter'` | Turtle graphics needs `tkinter`. On Linux run `sudo apt-get install python3-tk`; on Windows/macOS, reinstall Python from python.org, which bundles it. |
+| `No module named 'tkinter'` or `No module named '_tkinter'` | Turtle graphics needs `tkinter`. On Linux run `sudo apt-get install python3-tk`. On macOS with Homebrew Python, run `brew install python-tk@3.14` (swap in your version from `python3 --version`). On Windows/macOS otherwise, reinstall Python from python.org, which bundles it. |
 | `can't open file 'pacman.py'` | You're in the wrong folder. Run `cd pacman` first; `ls` (macOS/Linux) or `dir` (Windows) should list `pacman.py`. |
 | `SyntaxError: invalid syntax` pointing at `type Cell` | Your Python is too old (3.11 or earlier). Check with `python3 --version` and install 3.12+ as in Step 1. |
 
